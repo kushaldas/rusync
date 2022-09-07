@@ -58,6 +58,8 @@ impl SyncWorker {
         Ok(())
     }
 
+
+    #[allow(unused_variables)]
     fn sync(&self, src_entry: &Entry, opts: SyncOptions) -> Result<SyncOutcome, Error> {
         let rel_path = fsops::get_rel_path(src_entry.path(), &self.source);
         self.create_missing_dest_dirs(&rel_path)?;

@@ -73,13 +73,14 @@ pub fn copy_permissions(src: &Entry, dest: &Entry) -> Result<(), Error> {
     Ok(())
 }
 
+#[allow(unused_variables, unused_assignments)]
 fn copy_link(src: &Entry, dest: &Entry) -> Result<SyncOutcome, Error> {
     let src_target = std::fs::read_link(src.path())
         .with_context(|| format!("While copying source link '{}'", src.description()))?;
 
     let is_link = dest.is_link();
-    let outcome;
-    match is_link {
+    let mut should_return = false;
+    let outcome = match is_link {
         Some(true) => {
             let dest_target = std::fs::read_link(dest.path())
                 .with_context(|| format!("While creating target link: {}", dest.description()))?;
@@ -90,9 +91,10 @@ fn copy_link(src: &Entry, dest: &Entry) -> Result<SyncOutcome, Error> {
                         dest.description()
                     )
                 })?;
-                outcome = SyncOutcome::SymlinkUpdated;
+                Ok(SyncOutcome::SymlinkUpdated)
             } else {
-                return Ok(SyncOutcome::UpToDate);
+                should_return = true;
+                Ok(SyncOutcome::UpToDate)
             }
         }
         Some(false) => {
@@ -104,11 +106,16 @@ fn copy_link(src: &Entry, dest: &Entry) -> Result<SyncOutcome, Error> {
         }
         None => {
             // OK, dest does not exist
-            outcome = SyncOutcome::SymlinkCreated;
+            Ok(SyncOutcome::SymlinkCreated)
         }
-    }
+    };
+
     #[cfg(unix)]
     {
+        if should_return {
+            return outcome;
+        };
+
         unix::fs::symlink(&src_target, &dest.path()).with_context(|| {
             format!(
                 "Could not create link from {} to {}",
@@ -116,13 +123,15 @@ fn copy_link(src: &Entry, dest: &Entry) -> Result<SyncOutcome, Error> {
                 src.description()
             )
         })?;
-        Ok(outcome)
+        return outcome;
     }
 
     #[cfg(windows)]
     {
-        Ok(outcome)
+        return outcome;
     }
+    #[allow(unreachable_code)]
+    outcome
 }
 
 pub fn copy_entry(
